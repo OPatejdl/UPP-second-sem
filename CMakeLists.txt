@@ -4,7 +4,7 @@ PROJECT(UPP_SP2)
 
 SET(CMAKE_CXX_STANDARD 23)
 
-FILE(GLOB_RECURSE src src/*.cpp src/*.h)
+FILE(GLOB_RECURSE src src/*.cpp src/*.h src/*.hpp)
 
 SET(USE_SSL OFF CACHE BOOL "Use SSL")
 
