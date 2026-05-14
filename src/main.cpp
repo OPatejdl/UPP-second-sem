@@ -1,41 +1,47 @@
-/**
- * Kostra druhe semestralni prace z predmetu KIV/UPP
- * Soubory a hlavicku upravujte dle sveho uvazeni a nutnosti
- */
-
+#include <mpi.h>
 #include <string>
-#include <vector>
 #include <iostream>
 
-#include "utils.h"
-#include "server.h"
-
-void process(const std::vector<std::string>& URLs, std::string& vystup) {
-
-	// tuhle metodu implementujte
-	// v parametru URLs jsou URL adresy, ktere byly odeslany z formulare
-
-	// tohle nahradte vystupem, ktery chcete zobrazit uzivateli (tj. vysledkem zpracovani)
-	vystup = "Zadali jste: <ul>";
-	for (const auto& url : URLs) {
-		vystup += "<li>" + url + "</li>";
-	}
-	vystup += "</ul>";
-
-}
+#include "crawler.h"
 
 int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
 
-	// inicializace serveru
-	CServer svr;
-	if (!svr.Init("./data", "0.0.0.0", 8001)) {
-		std::cerr << "Nelze inicializovat server!" << std::endl;
-		return EXIT_FAILURE;
-	}
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-	// registrace callbacku pro zpracovani odeslanych URL
-	svr.RegisterFormCallback(process);
+    int N = 0, M = 0;
+    for (int i = 1; i < argc; i++) {
+        if (std::string(argv[i]) == "-n" && i + 1 < argc) N = std::stoi(argv[++i]);
+        else if (std::string(argv[i]) == "-m" && i + 1 < argc) M = std::stoi(argv[++i]);
+    }
 
-	// spusteni serveru
-	return svr.Run() ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (N <= 0 || M <= 0) {
+        if (rank == 0)
+            std::cerr << "Pouziti: mpirun -np <1+N+N*M> " << argv[0]
+                      << " -n <N> -m <M>\n";
+        MPI_Finalize();
+        return EXIT_FAILURE;
+    }
+
+    int expected = 1 + N + N * M;
+    if (size != expected) {
+        if (rank == 0)
+            std::cerr << "Pro N=" << N << " M=" << M << " je treba " << expected
+                      << " MPI procesu, spusteno " << size << ".\n";
+        MPI_Finalize();
+        return EXIT_FAILURE;
+    }
+
+    if (rank == 0) {
+        runMaster(N, M);
+    } else if (rank <= N) {
+        runWorkerA(rank, N, M);
+    } else {
+        runWorkerB(rank, N, M);
+    }
+
+    MPI_Finalize();
+    return EXIT_SUCCESS;
 }
